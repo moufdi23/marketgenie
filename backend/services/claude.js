@@ -67,15 +67,9 @@ Make every question highly specific to this exact business type — not generic.
   return extractJSON(msg.content[0].text);
 }
 
-async function generateStrategy(businessDescription, answers) {
-  const qa = answers.map(a => `Q: ${a.question}\nA: ${a.answer}`).join('\n\n');
-
-  const msg = await client.messages.create({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 8000,
-    messages: [{
-      role: 'user',
-      content: `You are a senior marketing strategist. Write a complete, specific marketing strategy for this small business owner. Do NOT add any introduction or closing text — start directly with the first ## section header.
+// Shared prompt builder for generateStrategy (avoids duplication between streaming / non-streaming paths).
+function buildStrategyPrompt(businessDescription, qa) {
+  return `You are a senior marketing strategist. Write a complete, specific marketing strategy for this small business owner. Do NOT add any introduction or closing text — start directly with the first ## section header.
 
 Business: "${businessDescription}"
 
@@ -190,10 +184,41 @@ Quick Wins (implement this week):
 4. [specific actionable win]
 5. [specific actionable win]
 6. [specific actionable win]
-7. [specific actionable win]`,
-    }],
-  });
+7. [specific actionable win]`;
+}
 
+/**
+ * generateStrategy
+ *
+ * When `onChunk` is provided the response is streamed: each text delta is
+ * passed to the callback as it arrives, and the full assembled string is
+ * returned once generation is complete.
+ *
+ * When `onChunk` is omitted a regular (blocking) request is made and the
+ * full string is returned when the model finishes.
+ */
+async function generateStrategy(businessDescription, answers, onChunk = null) {
+  const qa = answers.map(a => `Q: ${a.question}\nA: ${a.answer}`).join('\n\n');
+  const content = buildStrategyPrompt(businessDescription, qa);
+  const params = {
+    model: 'claude-sonnet-4-6',
+    max_tokens: 8000,
+    messages: [{ role: 'user', content }],
+  };
+
+  if (onChunk) {
+    // ── Streaming path ───────────────────────────────────────────────────────
+    const stream = client.messages.stream(params);
+    let fullText = '';
+    for await (const text of stream.text_stream) {
+      fullText += text;
+      onChunk(text);
+    }
+    return fullText;
+  }
+
+  // ── Non-streaming fallback ───────────────────────────────────────────────
+  const msg = await client.messages.create(params);
   return msg.content[0].text;
 }
 

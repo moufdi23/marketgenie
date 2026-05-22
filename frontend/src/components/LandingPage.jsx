@@ -264,10 +264,20 @@ function MockDashboard({ visible }) {
 
 // ── Main Component ─────────────────────────────────────────────────────────
 
-export default function LandingPage({ onGetStarted, error, onClearError, canGenerate = true, isDemo = false }) {
+export default function LandingPage({ onGetStarted, onShowSample, onShowWaitlist, error, onClearError, canGenerate = true, autoOpen = false, onAutoOpenHandled }) {
   const [showModal, setShowModal]   = useState(false);
   const [business, setBusiness]     = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  // When App signals that the modal should open immediately (e.g. after
+  // returning from the sample view via "Generate yours free →"), open it
+  // and tell App to clear the flag so it doesn't re-fire on the next render.
+  useEffect(() => {
+    if (autoOpen) {
+      setShowModal(true);
+      onAutoOpenHandled?.();
+    }
+  }, [autoOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [heroRef,         heroVisible]         = useReveal();
   const [statsRef,        statsVisible]        = useReveal();
@@ -346,7 +356,8 @@ export default function LandingPage({ onGetStarted, error, onClearError, canGene
                   className="emerald-btn px-10 py-4 rounded-2xl text-lg font-black">
                   <span>Get My Free Strategy →</span>
                 </button>
-                <button onClick={openModal}
+                <button
+                  onClick={() => { onClearError(); onShowSample(); }}
                   className="px-10 py-4 rounded-2xl text-lg font-bold border-2 border-gray-200 text-gray-600 hover:border-emerald-300 hover:text-emerald-700 transition-all">
                   See a Sample
                 </button>
@@ -560,7 +571,8 @@ export default function LandingPage({ onGetStarted, error, onClearError, canGene
                   </li>
                 ))}
               </ul>
-              <button onClick={openModal}
+              <button
+                onClick={onShowWaitlist}
                 className="w-full py-4 rounded-2xl font-bold text-base text-emerald-700 transition-all hover:scale-[1.02]"
                 style={{ background: '#ffffff', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}>
                 Join Waitlist →
@@ -650,13 +662,20 @@ export default function LandingPage({ onGetStarted, error, onClearError, canGene
           <div>
             <p className="text-xs font-bold tracking-widest uppercase mb-5" style={{ color: '#10B981' }}>Product</p>
             <ul className="space-y-3">
-              {['How it Works', 'Pricing', 'See a Sample'].map(link => (
+              {['How it Works', 'Pricing'].map(link => (
                 <li key={link}>
                   <a href="#" className="text-sm text-gray-500 hover:text-emerald-600 transition-colors font-medium">
                     {link}
                   </a>
                 </li>
               ))}
+              <li>
+                <button
+                  onClick={() => { onClearError(); onShowSample(); }}
+                  className="text-sm text-gray-500 hover:text-emerald-600 transition-colors font-medium text-left">
+                  See a Sample
+                </button>
+              </li>
             </ul>
           </div>
 
@@ -761,17 +780,15 @@ export default function LandingPage({ onGetStarted, error, onClearError, canGene
                   Free plan · 1 strategy per week · Resets every Monday
                 </p>
 
-                <a
-                  href="#"
-                  onClick={e => e.preventDefault()}
+                <button
+                  onClick={() => { closeModal(); onShowWaitlist(); }}
                   className="block w-full py-4 rounded-2xl font-black text-base text-white text-center transition-all hover:scale-[1.02] mb-4"
                   style={{
                     background: 'linear-gradient(135deg,#10B981,#059669)',
                     boxShadow: '0 4px 20px rgba(16,185,129,0.3)',
-                    textDecoration: 'none',
                   }}>
                   Join Pro Waitlist — Unlimited Strategies →
-                </a>
+                </button>
 
                 <div className="rounded-xl px-4 py-3 text-sm"
                   style={{ background: '#f9fafb', border: '1px solid #e5e7eb' }}>

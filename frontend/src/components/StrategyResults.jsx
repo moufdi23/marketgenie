@@ -441,7 +441,7 @@ function QuickWinsChecklist({ wins }) {
 // Wraps content in a blur + shows a lock card overlay.
 // Pass a static placeholder as children for sections with interactive UIs.
 
-function ProGate({ children, feature = 'this section' }) {
+function ProGate({ children, feature = 'this section', onShowWaitlist }) {
   return (
     <div style={{ position: 'relative', borderRadius: 16, overflow: 'hidden', minHeight: 280 }}>
       {/* Blurred content underneath */}
@@ -460,12 +460,13 @@ function ProGate({ children, feature = 'this section' }) {
           <p style={{ margin: '0 0 20px', color: '#6b7280', fontSize: 13, lineHeight: 1.6 }}>
             Upgrade to Pro to unlock <strong style={{ color: '#111827' }}>{feature}</strong> and all premium sections.
           </p>
-          <a href="#" onClick={e => e.preventDefault()}
-            style={{ display: 'block', width: '100%', padding: '12px 0', background: 'linear-gradient(135deg,#10B981,#059669)', color: '#fff', borderRadius: 12, fontWeight: 700, fontSize: 14, textDecoration: 'none', textAlign: 'center', boxShadow: '0 4px 16px rgba(16,185,129,0.3)' }}
+          <button
+            onClick={onShowWaitlist}
+            style={{ display: 'block', width: '100%', padding: '12px 0', background: 'linear-gradient(135deg,#10B981,#059669)', color: '#fff', borderRadius: 12, fontWeight: 700, fontSize: 14, textAlign: 'center', boxShadow: '0 4px 16px rgba(16,185,129,0.3)', border: 'none', cursor: 'pointer' }}
             onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.02)')}
             onMouseLeave={e => (e.currentTarget.style.transform = 'scale(1)')}>
             Join Waitlist →
-          </a>
+          </button>
           <p style={{ marginTop: 12, color: '#9ca3af', fontSize: 11, lineHeight: 1.5 }}>
             Free includes: Target Audience · Social · Calendar · 1 Email Template
           </p>
@@ -478,7 +479,7 @@ function ProGate({ children, feature = 'this section' }) {
 // ── Score Section ──────────────────────────────────────────────────────────
 // Free: score ring + explanation only. Breakdown + Quick Wins locked.
 
-function ScoreSection({ content, isPro }) {
+function ScoreSection({ content, isPro, onShowWaitlist }) {
   const score      = extractScore(content);
   const breakdown  = parseBreakdown(content);
   const quickWins  = parseQuickWins(content);
@@ -524,7 +525,7 @@ function ScoreSection({ content, isPro }) {
         </>
       ) : (
         /* Partial lock — blur breakdown + quick wins */
-        <ProGate feature="Score Breakdown & Quick Wins">
+        <ProGate feature="Score Breakdown & Quick Wins" onShowWaitlist={onShowWaitlist}>
           <div className="space-y-4">
             {breakdown.length > 0 && (
               <div className="result-card p-6">
@@ -549,7 +550,7 @@ function ScoreSection({ content, isPro }) {
 // ── Email Section ──────────────────────────────────────────────────────────
 // Free: first template only. Templates 2 & 3 are behind ProGate.
 
-function EmailSection({ content, isPro }) {
+function EmailSection({ content, isPro, onShowWaitlist }) {
   const templates = parseEmailTemplates(content);
   const [copied, setCopied]   = useState(null);
 
@@ -628,7 +629,7 @@ function EmailSection({ content, isPro }) {
             </div>
           ))
         ) : (
-          <ProGate feature={`Email Templates 2–${templates.length}`}>
+          <ProGate feature={`Email Templates 2–${templates.length}`} onShowWaitlist={onShowWaitlist}>
             <div className="space-y-4">
               {rest.map((tmpl, i) => (
                 <div key={i} className="result-card p-6">
@@ -908,7 +909,7 @@ function ToolRecommendations({ sectionKey }) {
 
 // ── Regenerate Button ──────────────────────────────────────────────────────
 
-function RegenerateBtn({ isPro, onRegenerate, loading }) {
+function RegenerateBtn({ isPro, onRegenerate, loading, onShowWaitlist }) {
   const [showTip, setShowTip] = useState(false);
   const tipRef = useRef(null);
 
@@ -933,11 +934,12 @@ function RegenerateBtn({ isPro, onRegenerate, loading }) {
             style={{ border: '1px solid #e5e7eb', boxShadow: '0 8px 32px rgba(0,0,0,0.12)' }}>
             <p className="text-sm font-bold text-gray-900 mb-1">Pro Feature</p>
             <p className="text-xs text-gray-500 mb-3 leading-relaxed">Regenerate any section with fresh AI-generated content tailored to your business.</p>
-            <a href="#" onClick={e => e.preventDefault()}
-              className="block text-center text-xs font-bold py-2 rounded-lg text-white"
-              style={{ background: 'linear-gradient(135deg,#10B981,#059669)' }}>
+            <button
+              onClick={() => { setShowTip(false); onShowWaitlist?.(); }}
+              className="block w-full text-center text-xs font-bold py-2 rounded-lg text-white"
+              style={{ background: 'linear-gradient(135deg,#10B981,#059669)', border: 'none', cursor: 'pointer' }}>
               Join Waitlist →
-            </a>
+            </button>
           </div>
         )}
       </div>
@@ -991,14 +993,23 @@ function FadeIn({ children }) {
 
 // ── Main Component ─────────────────────────────────────────────────────────
 
-export default function StrategyResults({ strategy, businessDescription, answers = [], onReset, isDemo = false }) {
-  const stratSections = useMemo(() => parseSections(strategy || ''), [strategy]);
+export default function StrategyResults({ strategy, businessDescription, answers = [], onReset, isDemo = false, isSample = false, isStreaming = false, onShowWaitlist, onStartFree }) {
+  // During streaming, omit the last section if it has no content yet — that
+  // means the model is still writing the section header.
+  const stratSections = useMemo(() => {
+    const all = parseSections(strategy || '');
+    if (isStreaming && all.length > 1 && all[all.length - 1].content === '') {
+      return all.slice(0, -1);
+    }
+    return all;
+  }, [strategy, isStreaming]);
 
-  // Append the synthetic Competitor Analysis tab
+  // In sample mode the competitor analysis is already embedded in the strategy
+  // text as a real ## section, so we don't add the synthetic interactive tab.
   const allSections = useMemo(() => [
     ...stratSections,
-    { title: 'Competitor Analysis', content: '', synthetic: true },
-  ], [stratSections]);
+    ...(isSample ? [] : [{ title: 'Competitor Analysis', content: '', synthetic: true }]),
+  ], [stratSections, isSample]);
 
   const [activeIdx, setActiveIdx]           = useState(0);
   const [sectionOverrides, setSectionOverrides] = useState({}); // idx → regenerated content
@@ -1032,7 +1043,7 @@ export default function StrategyResults({ strategy, businessDescription, answers
   const isPartialLock = !isDemo && (isEmail || isScore);
 
   const handleRegenerate = async () => {
-    if (!isDemo || isSynthetic) return;
+    if (!isDemo || isSynthetic || isSample) return;
     setRegenerating(activeIdx);
     try {
       const res = await fetch('/api/regenerate', {
@@ -1080,11 +1091,19 @@ export default function StrategyResults({ strategy, businessDescription, answers
             </div>
           </div>
           <div className="flex items-center gap-3 flex-shrink-0">
-            <div className="hidden sm:flex items-center gap-1.5 rounded-full px-3 py-1"
-              style={{ background: '#ECFDF5', border: '1px solid #A7F3D0' }}>
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-emerald-700 text-xs font-bold">Strategy Ready</span>
-            </div>
+            {isStreaming ? (
+              <div className="hidden sm:flex items-center gap-1.5 rounded-full px-3 py-1"
+                style={{ background: '#FEF3C7', border: '1px solid #FDE68A' }}>
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                <span className="text-amber-700 text-xs font-bold">Generating…</span>
+              </div>
+            ) : (
+              <div className="hidden sm:flex items-center gap-1.5 rounded-full px-3 py-1"
+                style={{ background: '#ECFDF5', border: '1px solid #A7F3D0' }}>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-emerald-700 text-xs font-bold">Strategy Ready</span>
+              </div>
+            )}
             <button onClick={onReset}
               className="text-sm font-bold px-4 py-2 rounded-xl transition-all border hover:bg-gray-50"
               style={{ color: '#374151', borderColor: '#e5e7eb' }}>
@@ -1094,8 +1113,22 @@ export default function StrategyResults({ strategy, businessDescription, answers
         </div>
       </header>
 
-      {/* ── Demo mode banner ───────────────────────────────────── */}
-      {isDemo && (
+      {/* ── Sample strategy watermark ──────────────────────────── */}
+      {isSample && (
+        <div style={{ background: 'linear-gradient(90deg,#1e40af,#1d4ed8)', borderBottom: '1px solid #3b82f6', padding: '10px 20px', textAlign: 'center' }}>
+          <span style={{ color: '#bfdbfe', fontSize: 12, fontWeight: 600 }}>
+            📋 Sample Strategy — The Corner Bistro, Chicago ·{' '}
+          </span>
+          <button
+            onClick={onStartFree}
+            style={{ color: '#ffffff', fontSize: 12, fontWeight: 800, background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', padding: 0 }}>
+            Generate yours free →
+          </button>
+        </div>
+      )}
+
+      {/* ── Demo mode banner (URL ?demo=true, not sample) ──────── */}
+      {isDemo && !isSample && (
         <div style={{ background: 'linear-gradient(90deg,#065F46,#047857)', borderBottom: '1px solid #059669', padding: '8px 20px', textAlign: 'center' }}>
           <span style={{ color: '#a7f3d0', fontSize: 12, fontWeight: 600 }}>
             🎯 Demo Mode — Full Pro access · All 8 sections unlocked · Regenerate enabled
@@ -1107,9 +1140,12 @@ export default function StrategyResults({ strategy, businessDescription, answers
       <div className="bg-white border-b border-gray-100">
         <div className="max-w-5xl mx-auto px-5 py-8">
           <div className="inline-flex items-center gap-2 rounded-full px-3 py-1 mb-4 text-xs font-bold"
-            style={{ background: '#ECFDF5', color: '#065F46', border: '1px solid #A7F3D0' }}>
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-            Your Complete Strategy is Ready
+            style={isStreaming
+              ? { background: '#FEF3C7', color: '#92400E', border: '1px solid #FDE68A' }
+              : { background: '#ECFDF5', color: '#065F46', border: '1px solid #A7F3D0' }}>
+            <span className="w-1.5 h-1.5 rounded-full"
+              style={{ background: isStreaming ? '#f59e0b' : '#10B981' }} />
+            {isStreaming ? 'Building your strategy — sections appear as they\'re ready' : 'Your Complete Strategy is Ready'}
           </div>
           <h1 className="text-2xl sm:text-3xl font-black text-gray-900 mb-2">Marketing Strategy</h1>
           <p className="text-gray-500 max-w-2xl leading-relaxed text-sm sm:text-base">
@@ -1123,6 +1159,13 @@ export default function StrategyResults({ strategy, businessDescription, answers
         style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
         <div ref={tabsRef} className="flex gap-2 px-5 py-3 overflow-x-auto min-w-0"
           style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+          {isStreaming && (
+            <div className="flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold flex-shrink-0"
+              style={{ background: '#FEF3C7', color: '#92400E', border: '1px solid #FDE68A' }}>
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+              {stratSections.length}/7
+            </div>
+          )}
           {allSections.map((sec, i) => {
             const m        = getMeta(sec.title);
             const isActive = i === activeIdx;
@@ -1168,9 +1211,10 @@ export default function StrategyResults({ strategy, businessDescription, answers
               <div className="flex items-center gap-2 flex-shrink-0">
                 <CopyBtn text={`${active.title}\n\n${activeContent}`} />
                 <RegenerateBtn
-                  isPro={isDemo}
+                  isPro={isDemo && !isSample}
                   onRegenerate={handleRegenerate}
                   loading={regenerating === activeIdx}
+                  onShowWaitlist={onShowWaitlist}
                 />
               </div>
             )}
@@ -1179,13 +1223,13 @@ export default function StrategyResults({ strategy, businessDescription, answers
           {/* ── Section-specific rendering ── */}
 
           {isScore && (
-            <ScoreSection content={activeContent} isPro={isDemo} />
+            <ScoreSection content={activeContent} isPro={isDemo} onShowWaitlist={onShowWaitlist} />
           )}
 
           {isAds && (
             isDemo
               ? <AdSection content={activeContent} />
-              : <ProGate feature="Ad Copy">
+              : <ProGate feature="Ad Copy" onShowWaitlist={onShowWaitlist}>
                   <AdSection content={activeContent} />
                 </ProGate>
           )}
@@ -1197,22 +1241,36 @@ export default function StrategyResults({ strategy, businessDescription, answers
                 <ToolRecommendations sectionKey="seo" />
               </>
             ) : (
-              <ProGate feature="SEO Keywords">
+              <ProGate feature="SEO Keywords" onShowWaitlist={onShowWaitlist}>
                 <SEOSection content={activeContent} />
               </ProGate>
             )
           )}
 
           {isEmail && (
-            <EmailSection content={activeContent} isPro={isDemo} />
+            <EmailSection content={activeContent} isPro={isDemo} onShowWaitlist={onShowWaitlist} />
           )}
 
           {isCompetitor && (
-            isDemo
+            isSample
+              /* Sample mode: render pre-built static analysis, no API call */
+              ? (
+                <div className="result-card p-6 sm:p-8">
+                  <div className="flex items-center gap-3 mb-5">
+                    <span className="text-2xl">⚔️</span>
+                    <div>
+                      <h4 className="font-black text-gray-900">vs. Maple Street Grill</h4>
+                      <p className="text-gray-400 text-xs">Competitive positioning analysis · Lincoln Park, Chicago</p>
+                    </div>
+                  </div>
+                  {renderContent(activeContent)}
+                </div>
+              )
+              : isDemo
               ? <CompetitorSection businessDescription={businessDescription} answers={answers} />
               : (
-                <ProGate feature="Competitor Analysis">
-                  {/* Static placeholder as blurred background — interactive elements won't be usable */}
+                <ProGate feature="Competitor Analysis" onShowWaitlist={onShowWaitlist}>
+                  {/* Static placeholder as blurred background */}
                   <div className="space-y-4">
                     <div className="result-card p-6">
                       <div className="h-5 rounded-lg bg-gray-200 w-48 mb-3" />
@@ -1236,6 +1294,10 @@ export default function StrategyResults({ strategy, businessDescription, answers
           {!isScore && !isAds && !isSEO && !isEmail && !isCompetitor && (
             <div className="result-card p-6 sm:p-8">
               {renderContent(activeContent)}
+              {/* Streaming cursor — shown while this section is still being written */}
+              {isStreaming && activeIdx === allSections.length - 2 && (
+                <span className="inline-block w-2 h-4 ml-0.5 align-middle rounded-sm bg-emerald-400 animate-pulse" />
+              )}
               {isSocial && <ToolRecommendations sectionKey="social" />}
             </div>
           )}

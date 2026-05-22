@@ -41,27 +41,23 @@ function writeUsage(weekKey, count) {
  * getPlan()
  *
  * Returns the current user's plan state. Call inside any component —
- * it's cheap (one localStorage read + URL parse per call).
+ * it's cheap (one localStorage read per call).
  *
- * isDemo      — URL contains ?demo=true → full Pro access, nothing recorded
- * canGenerate — user is allowed to start a new strategy right now
- * thisWeekCount — how many strategies generated this week (0 in demo mode)
- * recordUsage — call ONCE after a successful generation
+ * canGenerate   — user is allowed to start a new strategy right now
+ * thisWeekCount — how many strategies generated this week
+ * recordUsage   — call ONCE after a successful generation
  */
 export function getPlan() {
-  const isDemo = new URLSearchParams(window.location.search).get('demo') === 'true';
-
   const weekKey       = getWeekKey();
   const usage         = readUsage();
   const thisWeekCount = usage.weekKey === weekKey ? usage.count : 0;
-  const canGenerate   = isDemo || thisWeekCount < FREE_LIMIT;
+  const canGenerate   = thisWeekCount < FREE_LIMIT;
 
   function recordUsage() {
-    if (isDemo) return; // never burn a slot in demo mode
     const fresh = readUsage(); // re-read to avoid stale closure in async handlers
     const count = fresh.weekKey === weekKey ? fresh.count : 0;
     writeUsage(weekKey, count + 1);
   }
 
-  return { isDemo, canGenerate, thisWeekCount, recordUsage };
+  return { canGenerate, thisWeekCount, recordUsage };
 }

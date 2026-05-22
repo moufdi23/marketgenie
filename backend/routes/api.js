@@ -22,18 +22,43 @@ router.post('/questions', async (req, res) => {
   }
 });
 
-// ── Generate full strategy ─────────────────────────────────────────────────
+// ── Generate full strategy (SSE streaming) ────────────────────────────────
+//
+// Responds with Content-Type: text/event-stream.  Each event is a JSON
+// object on a `data:` line followed by two newlines (standard SSE format).
+//
+// Event shapes:
+//   { type: 'chunk',  text: string }   — one token delta from the model
+//   { type: 'done',   strategy: string } — full assembled text; stream ends
+//   { type: 'error',  message: string }  — generation failed; stream ends
+//
 router.post('/strategy', async (req, res) => {
+  const { businessDescription, answers } = req.body;
+  if (!businessDescription?.trim() || !Array.isArray(answers) || answers.length === 0) {
+    // Validation errors must be sent before switching to SSE mode.
+    return res.status(400).json({ error: 'Business description and answers are required' });
+  }
+
+  // Switch to SSE mode — do this before any await so headers go out immediately.
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
+  const send = (data) => res.write(`data: ${JSON.stringify(data)}\n\n`);
+
   try {
-    const { businessDescription, answers } = req.body;
-    if (!businessDescription?.trim() || !Array.isArray(answers) || answers.length === 0) {
-      return res.status(400).json({ error: 'Business description and answers are required' });
-    }
-    const strategy = await generateStrategy(businessDescription.trim(), answers);
-    res.json({ strategy });
+    const strategy = await generateStrategy(
+      businessDescription.trim(),
+      answers,
+      (chunk) => send({ type: 'chunk', text: chunk }),
+    );
+    send({ type: 'done', strategy });
   } catch (err) {
     console.error('Strategy error:', err.message);
-    res.status(500).json({ error: 'Failed to generate strategy. Please try again.' });
+    send({ type: 'error', message: 'Failed to generate strategy. Please try again.' });
+  } finally {
+    res.end();
   }
 });
 
