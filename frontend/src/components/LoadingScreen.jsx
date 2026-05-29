@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Sparkles } from 'lucide-react';
 
 const STEPS = [
   'Analyzing your business type…',
@@ -15,10 +16,15 @@ const STEPS = [
 export default function LoadingScreen({ message }) {
   const [stepIdx, setStepIdx] = useState(0);
   const [progress, setProgress] = useState(0);
+  const [msgVisible, setMsgVisible] = useState(true);
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setStepIdx(i => (i + 1) % STEPS.length);
+      setMsgVisible(false);
+      setTimeout(() => {
+        setStepIdx(i => (i + 1) % STEPS.length);
+        setMsgVisible(true);
+      }, 300);
     }, 2200);
     return () => clearInterval(interval);
   }, []);
@@ -31,46 +37,49 @@ export default function LoadingScreen({ message }) {
   }, []);
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-4">
-      {/* Logo with orbiting rings */}
-      <div className="relative mb-12">
-        <div
-          className="w-24 h-24 rounded-3xl flex items-center justify-center font-black text-4xl"
-          style={{ background: 'linear-gradient(135deg, #7c3aed, #3b82f6)', boxShadow: '0 0 60px rgba(124,58,237,0.5)' }}>
-          M
-        </div>
+    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center px-4">
 
-        {/* Orbit 1 */}
-        <div className="absolute inset-[-20px] rounded-full animate-spin-slow"
-          style={{ border: '1px solid rgba(124,58,237,0.3)' }}>
-          <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 rounded-full bg-purple-400" />
-        </div>
-
-        {/* Orbit 2 */}
-        <div className="absolute inset-[-36px] rounded-full animate-spin-rev"
-          style={{ border: '1px dashed rgba(59,130,246,0.2)' }}>
-          <div className="absolute top-1/2 -right-1.5 -translate-y-1/2 w-2 h-2 rounded-full bg-blue-400" />
+      {/* Spinner + icon */}
+      <div className="relative w-24 h-24 mb-10">
+        {/* Spinning arc */}
+        <div className="absolute inset-0 rounded-full border-4 border-slate-200 border-t-emerald-500 animate-spin" />
+        {/* Subtle second ring, slower, for depth */}
+        <div className="absolute inset-2 rounded-full border-2 border-emerald-100 border-b-emerald-300 animate-spin-rev" />
+        {/* Centered icon */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div
+            className="w-12 h-12 rounded-xl flex items-center justify-center shadow-md"
+            style={{ background: 'linear-gradient(135deg, #059669 0%, #047857 100%)' }}
+          >
+            <Sparkles size={22} className="text-white" />
+          </div>
         </div>
       </div>
 
-      <h2 className="text-2xl font-bold text-white mb-3">
-        {message || 'Generating Your Strategy'}
+      {/* Headline */}
+      <h2 className="text-xl font-bold text-slate-800 mb-2 text-center">
+        {message || 'Building your strategy'}
       </h2>
 
-      <div className="h-6 flex items-center mb-10">
-        <p className="text-gray-400 text-sm text-center transition-all duration-500">
+      {/* Rotating step with fade */}
+      <div className="h-5 flex items-center justify-center mb-10">
+        <p
+          className="text-slate-500 text-sm text-center transition-opacity duration-300"
+          style={{ opacity: msgVisible ? 1 : 0 }}
+        >
           {STEPS[stepIdx]}
         </p>
       </div>
 
       {/* Progress bar */}
-      <div className="w-72 h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
+      <div className="w-64 sm:w-72 h-1.5 rounded-full bg-slate-200 overflow-hidden">
         <div
           className="h-full rounded-full shimmer-bar"
           style={{ width: `${progress}%`, transition: 'width 0.3s ease' }}
         />
       </div>
-      <p className="mt-4 text-gray-600 text-xs">This usually takes 15–30 seconds</p>
+
+      <p className="mt-3 text-slate-400 text-xs">This usually takes 15–30 seconds</p>
     </div>
   );
 }
